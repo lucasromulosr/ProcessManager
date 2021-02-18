@@ -12,25 +12,26 @@ int main(){
     char c;
     char* args[] = {"./manager", NULL};
     pid_t cpid;
-    
+
     if(pipe(fd) < 0){
         perror("pipe");
         exit(EXIT_FAILURE);
     }
-    
+
     if((cpid = fork()) == -1){
         perror("fork");
         exit(EXIT_FAILURE);
     }
-    
+
     if(cpid == 0){
         close(fd[1]);   // fecha write
         dup2(fd[0], STDIN_FILENO);  // read >> entrada padrao
         close(fd[0]);   // fecha read
         execv(args[0], args);   // exec manager
 //         execlp("./manager", "./manager", NULL);
-        
+
     } else {
+        
         close(fd[0]);   // fecha read
         do {
             c = read_command();
@@ -38,17 +39,17 @@ int main(){
         }while (c != 'T');
         close(fd[1]);   // fecha write
     }
-    
+
     printf("COMMANDER.C SE FOI <--\n");
     return 0;
 }
 
 char read_command(){
-    
+
     char c = '\0';
     while(!verify_input(toupper(c)))
         scanf("%c", &c);
-    
+
     return toupper(c);
 }
 

@@ -1,0 +1,12 @@
+S 1000
+A 19
+A 20
+D 23
+A 55
+F 1
+R FILE_A
+F 1
+R FILE_B
+F 1
+R FILE_C
+E
