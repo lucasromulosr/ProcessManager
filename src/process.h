@@ -14,15 +14,21 @@ typedef struct instruction_t{
 } instruction_t;
 
 typedef struct process_t{
-	int id, pid, pc;
-	int var, start;
-    int cpu_usage;
+	int id, pid, start;        // from PM
+	int pc, var, cpu_usage;    // initialized 0
  	instruction_t** instruction;
 } process_t;
 
-process_t* new_process();
+/* -- PROCESS -- */
+process_t* new_process(char*);
+void cp_process(process_t*, process_t*);
+
+/* -- INSTRUCTION -- */
 instruction_t** new_instructions(char*);
 
-void execute(); // START THAT SHIT
+/* -- VAR -- */
+void atualize_var(int, process_t*);
+void add_var(int, process_t*);
+void sub_var(int, process_t*);
 
 #endif

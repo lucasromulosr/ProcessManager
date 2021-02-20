@@ -1,4 +1,12 @@
 # ProcessManager
 > In development.
-##### v0.2.0
+##### v1.0.0?
+
+### Execucao
+```
+cd pasta/do/projeto/
+cd src/
+make
+./commander
+```
 

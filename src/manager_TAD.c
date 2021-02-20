@@ -1,16 +1,74 @@
 #include "manager.h"
 
+void reporter(process_manager_t* pm){
+    
+//  pid, ppid, /prioridade/, valor, tempo inicio, CPU usada ate agora
+    
+    int id;
+    process_t* p;
+    
+    printf("***********************************\n");
+    printf("Estado do sistema:\n");
+    printf("***********************************\\\\\n");
+    printf("TEMPO ATUAL: %d\n", pm->timer);
+    
+    printf("TABELA PCB:\n");
+    for(int i = 0; i < pm->next_pcb; i++){
+        p = pm->pcb_table[i];
+        printf("%d %d %d %d %d \n", p->id, p->pid, p->var, p->start, p->cpu_usage);
+    }
+    
+    printf("BLOQUEADO:\n");
+    for(int i = 0; i < pm->next_locked; i++){
+        printf("%d - ", pm->locked[i]);   // dbg
+        id = pm->locked[i];
+        p = pm->pcb_table[id];
+        printf("%d %d %d %d %d \n", p->id, p->pid, p->var, p->start, p->cpu_usage);
+    }
+
+    printf("PRONTO:\n");
+    for(int i = 0; i < pm->next_ready; i++){
+        printf("%d - ", pm->ready[i]);   // dbg
+        id = pm->ready[i];
+        p = pm->pcb_table[id];
+        printf("%d %d %d %d %d \n", p->id, p->pid, p->var, p->start, p->cpu_usage);
+    }
+    
+    printf("EXECUTANDO:\n");
+        if((p = pm->cpu) != NULL)
+        printf("%d %d %d %d %d \n", p->id, p->pid, p->var, p->start, p->cpu_usage);
+}
+
+// TIRAR DBG
+process_manager_t* initialize_process_manager(){
+    
+    process_manager_t* pm;
+    pm = (process_manager_t*) malloc (sizeof(process_manager_t));
+    pm->pcb_table = new_pcb_table();
+    pm->ready = new_line();
+    pm->locked = new_line();
+    
+    pm->timer = 0;
+    pm->next_id = 0;
+    pm->next_pcb = 0;
+    pm->next_ready = 0;
+    pm->next_locked = 0;
+    
+    pm->pcb_table[pm->next_pcb++] = 
+    create_process(&pm->next_id, -1, pm->timer, "../init.txt");
+    
+    pm->cpu = pm->pcb_table[0];
+    
+    return pm;
+}
+
 process_t* create_process(int *id, int pid, int timer, char* program){
 
-    
-    process_t* process = new_process();
+    process_t* process = new_process(program);
 
     process->id = *id;
 	process->pid = pid;
-	process->pc = 0;
-	process->var = -55;
 	process->start = timer;
-    process->instruction = new_instructions(program);
 
 	(*id)++;
 
@@ -26,79 +84,177 @@ process_t** new_pcb_table(){
     return pcb_table;
 }
 
-process_list_t* new_process_list(){
-    
-    process_list_t* list = (process_list_t*) malloc (sizeof(process_list_t));
-    list->process_id = (int*) malloc (PROCESS_N * sizeof(int));
-    for(int i = 0; i < PROCESS_N; i++)
-        list->process_id[i] = -1;
-    list->next = 0;
-    
-    return list;
-}
-
-void unlock_process(process_list_t* locked, process_list_t* ready){
-
-    if(locked->process_id[0] != -1){
-        
-        ready->process_id[ready->next] = locked->process_id[0];
-        (ready->next)++;
-        
-        for(int i = 0; i < locked->next; i++)
-            locked->process_id[i] = locked->process_id[i+1];
-        (locked->next)--;
-    }
-}
+/* *********** EDITING *********** */
 
 
+void execute(process_manager_t* pm){
 
-void reporter(int timer, process_t* cpu, process_t** pcb_table, process_list_t* locked, process_list_t* ready){
-    
-//  pid, ppid, /prioridade/, valor, tempo inicio, /CPU usada ate agora/
-    
-    int id;
-    process_t* p;
-    
-    printf("***********************************\n");
-    printf("Estado do sistema:\n");
-    printf("***********************************\\\\\n");
-    printf("TEMPO ATUAL: %d\n", timer);
-    
-    printf("BLOQUEADO:\n");
-    for(int i = 0; i < locked->next; i++){
-        id = locked->process_id[i];
-        p = pcb_table[id];
-        printf("%d %d %d %d \n", p->id, p->pid, p->var, p->start);
-    }
-
-    printf("PRONTO:\n");
-    for(int i = 0; i < ready->next; i++){
-        id = ready->process_id[i];
-        p = pcb_table[id];
-        printf("%d %d %d %d \n", p->id, p->pid, p->var, p->start);
+    if(pm->cpu == NULL){
+        printf("NULL CPU <<<----\n");
+        return;
     }
     
-    printf("EXECUTANDO:\n");
-        printf("%d %d %d %d \n", cpu->id, cpu->pid, cpu->var, cpu->start);
+    process_t* cpu = pm->cpu;
+    instruction_t* instruction;
+    instruction = cpu->instruction[cpu->pc++];
+    
+    char c = instruction->type;
+    int value;
+    if(c == 'S' || c== 'A' || c == 'D' || c == 'F')
+        value = atoi(instruction->value);
+    
+    cpu->cpu_usage++;
+    switch( c ){
+        case 'S': atualize_var(value, cpu); break;
+        case 'A': add_var(value, cpu); break;
+        case 'D': sub_var(value, cpu); break;
+        case 'B': lock_process(pm); break;
+        case 'E': remove_process(pm); break;
+        case 'F': child_process(value, pm); break;
+        case 'R': change_image(instruction->value, cpu); break;
+    }
+    
+    printf("instruct %c %s\n", instruction->type, instruction->value);
+    scheduler(pm);
 }
 
 
+void child_process(int value, process_manager_t* pm){
+    
+    process_t* cpu = pm->cpu;
+    process_t* child = (process_t*) malloc (sizeof(process_t));
+    
+    cp_process(child, cpu);
+    child->id = pm->next_id++;
+    child->pid = cpu->id;
+    child->start = pm->timer;
+    child->cpu_usage = 0;
+    
+    cpu->pc+=value;
+    
+    pm->ready[pm->next_ready++] = pm->next_pcb;
+    pm->pcb_table[pm->next_pcb++] = child;
+}
 
-void remove_process(int id, int* next_id, process_t** pcb_table){
+void change_image(char* program, process_t* p){
+    
+    p->pc = 0;
+    p->var = 0;
+    p->instruction = new_instructions(program);
+    
+}
+
+
+
+
+
+
+/* *********** END EDITING *********** */
+
+
+
+
+void scheduler(process_manager_t* pm){
+
+    int id = -1;
+    if(pm->cpu != NULL)
+        for(int i = 0; i < pm->next_pcb; i++)
+            if(pm->cpu->id == pm->pcb_table[i]->id)
+                id = i;
+    printf("ID FOUND %d <<<---- \n", id);   // dbg
+    
+    if(id != -1)
+        add_line(id, pm->ready, &pm->next_ready);
+    
+    ready_to_cpu(pm);
+}
+
+void ready_to_cpu(process_manager_t* pm){
+    
+    if(pm->next_ready > 0){
+        pm->cpu = pm->pcb_table[pm->ready[0]];
+        move_line(pm->ready, &pm->next_ready);
+    }
+    else pm->cpu = NULL;
+}
+
+void lock_process(process_manager_t* pm){
     
     int match = -1;
-    
-    for(int i = 0; i < *next_id; i++)
-        if(pcb_table[i]->id == id)
+    for(int i = 0; i < pm->next_pcb; i++)
+        if(pm->cpu->id == pm->pcb_table[i]->id)
             match = i;
         
-    if(match != -1){
+    printf("MATCH FOUND %d <<----\n", match);   // dbg
+    
+    pm->locked[pm->next_locked++] = match;
+    
+    if(pm->ready)
+    
+    pm->cpu = NULL;
+}
 
-        free(pcb_table[match]);
+void unlock_process(process_manager_t* pm){
 
-        for(int i = match; i < *next_id; i++)
-            pcb_table[i] = pcb_table[i+1];
-
-        (*next_id)--;        
+    if(pm->locked[0] != -1){
+        
+        if(pm->cpu == NULL)
+            pm->cpu = pm->pcb_table[pm->locked[0]];
+        else
+            add_line(pm->locked[0], pm->ready, &pm->next_ready);  
+        
+        move_line(pm->locked, &pm->next_locked);
+        
     }
+}
+
+void remove_process(process_manager_t* pm){   // remover processo da CPU
+    
+//     process_t* p;
+    int id = -1;
+    
+    for(int i = 0; i < pm->next_pcb; i++)
+        if(pm->cpu->id == pm->pcb_table[i]->id)
+            id = i;
+        
+    free(pm->pcb_table[id]);
+    
+    for(int i = id; i < pm->next_pcb-1; i++){
+        
+        cp_process(pm->pcb_table[i], pm->pcb_table[i+1]);
+        free(pm->pcb_table[i+1]);
+    }
+    
+    for(int i = 0; i < pm->next_ready; i++)
+        if(pm->ready[i] > id)
+            pm->ready[i]--;
+    
+    for(int i = 0; i < pm->next_locked; i++)
+        if(pm->locked[i] > id)
+            pm->locked[i]--;
+        
+    pm->next_pcb--;
+    pm->cpu = NULL;
+}
+
+/* ******** LINES ******** */
+int* new_line(){
+    
+    int* line;
+    line = (int*) malloc (PROCESS_N * sizeof(int));
+    
+    for(int i = 0; i < PROCESS_N; i++)
+        line[i] = -1;
+    
+    return line;
+}
+
+void move_line(int* line, int* size){
+    for(int i = 0; i < *size; i++)
+        line[i] = line[i+1];
+    (*size)--;
+}
+
+void add_line(int x, int* line, int* size){
+    line[(*size)++] = x;
 }
