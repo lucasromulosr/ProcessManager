@@ -24,29 +24,33 @@ int main(){
     }
 
     if(cpid == 0){
-        close(fd[1]);   // fecha write
-        dup2(fd[0], STDIN_FILENO);  // read >> entrada padrao
-        close(fd[0]);   // fecha read
-        execv(args[0], args);   // exec manager
-//         execlp("./manager", "./manager", NULL);
-
+        
+        close(fd[1]);
+        
+        dup2(fd[0], STDIN_FILENO);
+        close(fd[0]);
+        
+        execv(args[0], args);
+        
     } else {
         
-        close(fd[0]);   // fecha read
+        close(fd[0]);
+        
         do {
             c = read_command();
             write(fd[1], &c, 1);
         }while (c != 'T');
-        close(fd[1]);   // fecha write
+        
+        close(fd[1]);
     }
 
-    printf("COMMANDER.C SE FOI <--\n");
     return 0;
 }
 
 char read_command(){
 
     char c = '\0';
+    
     while(!verify_input(toupper(c)))
         scanf("%c", &c);
 

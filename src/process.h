@@ -21,7 +21,6 @@ typedef struct process_t{
 
 /* -- PROCESS -- */
 process_t* new_process(char*);
-void cp_process(process_t*, process_t*);
 
 /* -- INSTRUCTION -- */
 instruction_t** new_instructions(char*);

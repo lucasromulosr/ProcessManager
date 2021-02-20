@@ -1,5 +1,4 @@
 #include "manager.h"
-#include <ctype.h>
 
 int main(){
 
@@ -9,7 +8,7 @@ int main(){
     char c;
     do {
         scanf("%c", &c);
-
+        
         switch( c ){
             case 'Q': execute(pm); break;
             case 'U': unlock_process(pm); break;

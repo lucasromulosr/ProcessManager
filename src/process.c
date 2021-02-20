@@ -1,5 +1,7 @@
 #include "process.h"
 
+/* ***** PROCESS ***** */
+// creates a process and its intruction array
 process_t* new_process(char* program){
     
     process_t* p = (process_t*) malloc (sizeof(process_t));
@@ -11,18 +13,15 @@ process_t* new_process(char* program){
     return p;
 }
 
-void cp_process(process_t* copy, process_t* p){
-    
-    copy->id = (int)p->id;
-    copy->pid = (int)p->pid;
-    copy->start = (int)p->start;
-    copy->pc = (int)p->pc;
-    copy->var = (int)p->var;
-    copy->cpu_usage = (int)p->cpu_usage;
-    copy->instruction = (instruction_t**) p->instruction;
-}
 
+/* ***** INSTRUCTION ***** */
+// creates a instruction array from the program file 
+// its formated as "type value", ex "A 30"
+// B and E instructions are just "type"
 instruction_t** new_instructions(char* program){
+    
+    char file_name[] = "../programs/";
+    strcat(file_name, program);
     
     instruction_t** instruction;
     instruction = (instruction_t**) malloc (INSTRUCTION_N * sizeof(instruction_t*));
@@ -31,32 +30,37 @@ instruction_t** new_instructions(char* program){
         instruction[i]->value = (char*) malloc (INSTRUCTION_SIZE * sizeof(char));
     }
     
-    printf("%s <---\n", program);   // dbg
-    FILE* file = fopen(program, "rt");
+    FILE* file = fopen(file_name, "rt");
 	if(file == NULL) {
-		printf("PROBLEMA EM ABRIR O ARQUIVO\n");  // dbg
+		printf("_/> Theres was problem opening file. Please (t)erminate. _");  // dbg
 		exit(EXIT_FAILURE);
-	} else printf("ABRIU O ARQUIVO!\n");   // dbg
-
-    int i = 0;
-	char c, line[INSTRUCTION_SIZE];
+    }
+    
+    int i = 0;  // index
+	char type, value[INSTRUCTION_SIZE];
+    
+    // goes through extracting instructions
 	while(!feof(file)){
-        strcpy(line, "");
         
-        fscanf(file, "%c ", &c);
-        if(!(c == 'B' || c == 'E'))
-            fscanf(file, "%s ", line);
+        strcpy(value, "");                  // "NULL"s value 
         
-        instruction[i]->type = c;
-        strcpy(instruction[i]->value, line);
+        fscanf(file, "%c ", &type);         // gets type
+        if(!(type == 'B' || type == 'E'))
+            fscanf(file, "%s ", value);     // gets value
+        
+        // save into array
+        instruction[i]->type = type;
+        strcpy(instruction[i]->value, value);
         
 	    i++;
 	}
+	
 	fclose(file);
     
     return instruction;
 }
 
+/* ***** VAR ***** */
 void atualize_var(int value, process_t* p){
     p->var = value;
 }
