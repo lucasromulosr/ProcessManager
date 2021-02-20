@@ -61,16 +61,16 @@ instruction_t** new_instructions(char* program){
 }
 
 /* ***** VAR ***** */
-void atualize_var(int value, process_t* p){
-    p->var = value;
+void set_var(int value, process_t* p){
+    p->var = value; // set var
 }
 
 void add_var(int value, process_t* p){
-    p->var+=value;
+    p->var+=value;  // adds to var
 }
 
-void sub_var(int value, process_t* p){
-    p->var-=value;
+void dec_var(int value, process_t* p){
+    p->var-=value;  // decreases from var
 }
 
 

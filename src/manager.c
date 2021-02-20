@@ -1,5 +1,7 @@
 #include "manager.h"
 
+#include <unistd.h>
+
 int main(){
 
     process_manager_t* pm;

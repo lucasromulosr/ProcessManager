@@ -94,7 +94,7 @@ process_t** new_pcb_table(){
 
 /* *********** EDITING *********** */
 
-
+// executa processo na cpu (instrucao Q)
 void execute(process_manager_t* pm){
 
     if(pm->cpu == NULL){
@@ -115,19 +115,19 @@ void execute(process_manager_t* pm){
     
     cpu->cpu_usage++;
     switch( c ){
-        case 'S': atualize_var(value, cpu); break;
+        case 'S': set_var(value, cpu); break;
         case 'A': add_var(value, cpu); break;
-        case 'D': sub_var(value, cpu); break;
+        case 'D': dec_var(value, cpu); break;
         case 'B': lock_process(pm); break;
-        case 'E': remove_process(pm); break;
-        case 'F': child_process(value, pm); break;
-        case 'R': change_image(instruction->value, cpu); break;
+        case 'E': exit_process(pm); break;
+        case 'F': fork_process(value, pm); break;
+        case 'R': run_image(instruction->value, cpu); break;
     }
     
     scheduler(pm);
 }
 
-
+// escalonador
 void scheduler(process_manager_t* pm){
 
     int id = -1;
@@ -195,7 +195,7 @@ void unlock_process(process_manager_t* pm){
 // current process finished (E instructio)
 // removes process from pcb table
 // atualizes index (w/ pcb) in ready and locked lines
-void remove_process(process_manager_t* pm){
+void exit_process(process_manager_t* pm){
     
     int id = -1;
     
@@ -223,10 +223,11 @@ void remove_process(process_manager_t* pm){
     pm->cpu = NULL;
 }
 
-// creates a copy of the current process
-// sets child process id, pid, start time, cpu_usage
-// adds new process to pcb table and ready line
-void child_process(int value, process_manager_t* pm){
+// creates a copy of the current process.
+// sets child process id, pid, start time, cpu_usage.
+// adds new process to pcb table and ready line.
+// current process jumps 'value' instructions
+void fork_process(int value, process_manager_t* pm){
     
     process_t* cpu = pm->cpu;
     process_t* child = (process_t*) malloc (sizeof(process_t));
@@ -244,7 +245,7 @@ void child_process(int value, process_manager_t* pm){
 }
 
 // changes current process image
-void change_image(char* program, process_t* p){
+void run_image(char* program, process_t* p){
     
     p->pc = 0;
     p->var = 0;

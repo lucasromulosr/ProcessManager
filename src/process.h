@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define INSTRUCTION_N 100
-#define INSTRUCTION_SIZE 20
+#define INSTRUCTION_N 100       // n instructions / process
+#define INSTRUCTION_SIZE 20     // size of instruction value
 
 typedef struct instruction_t{
 	char type;
@@ -26,8 +26,21 @@ process_t* new_process(char*);
 instruction_t** new_instructions(char*);
 
 /* -- VAR -- */
-void atualize_var(int, process_t*);
+void set_var(int, process_t*);
 void add_var(int, process_t*);
-void sub_var(int, process_t*);
+void dec_var(int, process_t*);
 
 #endif
+
+/*
+    id, pid, start são definidos pelo manager
+    
+    pc, var e cpu_usage iniciam em 0
+    
+    instruction é uma tabela de instrucoes
+        extraidas do arquivo (ele n fica aberto).
+        ex: {A, "55"}, {E, ""}.
+        As instrucoes E e B possuem a segunda
+        posicao vazia.
+        
+ */
