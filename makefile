@@ -32,7 +32,7 @@ all: objFolder $(OBJ)
 
 install: binFolder all
 	@ echo 'Building binaries using $(CC)...'
-	@ $(CC) -o ./bin/commander ./obj/commander.o
+	@ $(CC) -o ./bin/process_manager ./obj/commander.o
 	@ $(CC) -o ./bin/manager ./obj/manager.o \
 	./obj/manager_TAD.o ./obj/process.o
 	@ $(CC) -o ./bin/reporter ./obj/reporter.o
