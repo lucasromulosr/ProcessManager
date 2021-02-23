@@ -32,7 +32,7 @@ instruction_t** new_instructions(char* program){
     
     FILE* file = fopen(file_name, "rt");
 	if(file == NULL) {
-		printf("_/> Theres was problem opening file. Please (t)erminate. _");  // dbg
+		printf("_/> Theres was a problem opening file. Please (t)erminate. _");  // dbg
 		exit(EXIT_FAILURE);
     }
     

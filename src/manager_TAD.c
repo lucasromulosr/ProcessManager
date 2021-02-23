@@ -1,39 +1,53 @@
 #include "manager.h"
+#include <unistd.h>
 
 /* ***** REPORTER ***** */
 void reporter(process_manager_t* pm){
     
-//  pid, ppid, /prioridade/, valor, tempo inicio, CPU usada ate agora
+    int fd[2];
+    pid_t pid;
+    char* args[] = {"./reporter", NULL};
     
-    int id;
-    process_t* p;
-    
-    printf("***********************************\n");
-    printf("Sys status:\n");
-    printf("***********************************\\\\\n");
-    printf("TIME RUNNING: \t%d\n", pm->timer);
-    
-    printf("|pid\t|ppid\t|var\t|start\t|cpu_usage\n");
-    
-    printf("|RUNNING PROCESS:\n");
-        if((p = pm->cpu) != NULL)
-        printf("|%d \t|%d \t|%d \t|%d \t|%d \n", 
-               p->id, p->pid, p->var, p->start, p->cpu_usage);
-    
-    printf("|LOCKED PROCESSES:\n");
-    for(int i = 0; i < pm->next_locked; i++){
-        id = pm->locked[i];
-        p = pm->pcb_table[id];
-        printf("|%d \t|%d \t|%d \t|%d \t|%d \n", 
-               p->id, p->pid, p->var, p->start, p->cpu_usage);
+    if((pipe(fd)) < 0){
+        perror("pipe");
+        exit(EXIT_FAILURE);
     }
+    
+    if((pid = fork()) == -1){
+            perror("fork");
+        exit(EXIT_FAILURE);
+    }
+    
+    if(pid == 0){
+        
+        close(fd[1]);
+        dup2(fd[0], STDIN_FILENO);
+        close(fd[0]);
+        execv(args[0], args);
+        
+    } else {        // send process manager 
+                    // values through pipe
+        close(fd[0]);
+        
+        write(fd[1], &pm->timer, sizeof(int));
+        write(fd[1], &pm->next_id, sizeof(int));
+        write(fd[1], &pm->next_pcb, sizeof(int));
+        write(fd[1], &pm->next_ready, sizeof(int));
+        write(fd[1], &pm->next_blocked, sizeof(int));
+        
+        int null_cpu_signal = 0;
+        if(pm->cpu == NULL) null_cpu_signal = 1;
+        write(fd[1], &null_cpu_signal, sizeof(int));
+        
+        write(fd[1], pm->cpu, sizeof(process_t));
+        
+        for(int i = 0; i < pm->next_pcb; i++)
+            write(fd[1], pm->pcb_table[i], sizeof(process_t));
+        
+        write(fd[1], pm->ready, pm->next_ready * sizeof(int));
+        write(fd[1], pm->blocked, pm->next_blocked * sizeof(int));
 
-    printf("|READY PROCESSES:\n");
-    for(int i = 0; i < pm->next_ready; i++){
-        id = pm->ready[i];
-        p = pm->pcb_table[id];
-        printf("|%d \t|%d \t|%d \t|%d \t|%d \n", 
-               p->id, p->pid, p->var, p->start, p->cpu_usage);
+        close(fd[1]);
     }
 }
 
@@ -45,15 +59,17 @@ process_manager_t* initialize_process_manager(){
     process_manager_t* pm;
     pm = (process_manager_t*) malloc (sizeof(process_manager_t));
     
+    pm->cpu = (process_t*) malloc (sizeof(process_t));
+    
     pm->pcb_table = new_pcb_table();
-    pm->ready = new_line();
-    pm->locked = new_line();
+    pm->ready = new_queue();
+    pm->blocked = new_queue();
     
     pm->timer = 0;
     pm->next_id = 0;
     pm->next_pcb = 0;
     pm->next_ready = 0;
-    pm->next_locked = 0;
+    pm->next_blocked = 0;
     
     // creates first process
     // increments next_id and next_pcb
@@ -73,13 +89,13 @@ process_t* first_process(int *id, int pid, int timer, char* program){
     process_t* process = new_process(program);
 
     process->id = *id;
-	process->pid = pid;
-	process->start = timer;
+    process->pid = pid;
+    process->start = timer;
 
     // increments next_id
-	(*id)++;
+    (*id)++;
 
-	return process;
+    return process;
 }
 
 // creates pcb table
@@ -92,9 +108,8 @@ process_t** new_pcb_table(){
     return pcb_table;
 }
 
-/* *********** EDITING *********** */
-
-// executa processo na cpu (instrucao Q)
+/* ***** SCHEDULING ***** */
+// executes 1 instruction from the process running
 void execute(process_manager_t* pm){
 
     if(pm->cpu == NULL){
@@ -102,23 +117,28 @@ void execute(process_manager_t* pm){
         return;
     }
     
-    process_t* cpu = pm->cpu;
-    instruction_t* instruction;
-    instruction = cpu->instruction[cpu->pc++];
+    process_t* cpu = pm->cpu;       // ponits to cpu process
+    instruction_t* instruction;     // points to instruction
+    instruction = cpu->instruction[cpu->pc++];  // adds pc
     
-    printf("p:%d instruct %c %s\n", cpu->id, instruction->type, instruction->value);
+    printf("_/> pid %d: %c %s\n", cpu->id, instruction->type,
+            instruction->value);
     
+    // those types of instructions are 'c int';
+    // atoi converts a string (value) to int
     char c = instruction->type;
     int value;
     if(c == 'S' || c== 'A' || c == 'D' || c == 'F')
         value = atoi(instruction->value);
     
+    // adss cpu usage time to current process
     cpu->cpu_usage++;
+    
     switch( c ){
         case 'S': set_var(value, cpu); break;
         case 'A': add_var(value, cpu); break;
         case 'D': dec_var(value, cpu); break;
-        case 'B': lock_process(pm); break;
+        case 'B': block_process(pm); break;
         case 'E': exit_process(pm); break;
         case 'F': fork_process(value, pm); break;
         case 'R': run_image(instruction->value, cpu); break;
@@ -127,7 +147,10 @@ void execute(process_manager_t* pm){
     scheduler(pm);
 }
 
-// escalonador
+// after the execution, the scheduler takes the
+// running process to the end of the ready queue,
+// if the process didnt end of blocked;
+// the first process in ready queue goes to cpu
 void scheduler(process_manager_t* pm){
 
     int id = -1;
@@ -137,87 +160,98 @@ void scheduler(process_manager_t* pm){
                 id = i;
     
     if(id != -1)
-        add_line(id, pm->ready, &pm->next_ready);
+        add_queue(id, pm->ready, &pm->next_ready);
     
     ready_to_cpu(pm);
 }
 
-
-/* *********** END EDITING *********** */
-
-
-
-
 /* ***** PROCESS ***** */
-// moves the first precess in ready line
-// to the cpu
+// moves the first precess in ready queue
+// to the cpu and moves the queue
 void ready_to_cpu(process_manager_t* pm){
     
+    // pm->next_ready indicates how many processes
+    // are in queue
     if(pm->next_ready > 0){
         pm->cpu = pm->pcb_table[pm->ready[0]];
-        move_line(pm->ready, &pm->next_ready);
+        move_queue(pm->ready, &pm->next_ready);
     }
     else pm->cpu = NULL;
 }
 
 // moves the current cpu process
-// to the locked line
-void lock_process(process_manager_t* pm){
+// to the blocked queue
+void block_process(process_manager_t* pm){
     
     int match = -1;
+    // gets the process index on pcb table
     for(int i = 0; i < pm->next_pcb; i++)
         if(pm->cpu->id == pm->pcb_table[i]->id)
             match = i;
     
-    pm->locked[pm->next_locked++] = match;
-    
-    if(pm->ready)
+    // saves the index in the blocked queue
+    pm->blocked[pm->next_blocked++] = match;
     
     pm->cpu = NULL;
 }
 
-// moves the first process in the locked line
-// to the end of the ready line
-void unlock_process(process_manager_t* pm){
+// moves the first process in the blocked queue
+// to the end of the ready queue
+void unblock_process(process_manager_t* pm){
 
-    if(pm->locked[0] != -1){
+    // pcb indice is always >= 0;
+    // if queue value is -1, means that its empty;
+    // if the 1st position is empty, they all are
+    if(pm->blocked[0] != -1){
         
+        int index = pm->blocked[0];
+        
+        // if the cpu is empty, that means that there was
+        // no process ready in queue, so the unblocked
+        // process goes straight to the cpu
         if(pm->cpu == NULL)
-            pm->cpu = pm->pcb_table[pm->locked[0]];
+            pm->cpu = pm->pcb_table[index];
         else
-            add_line(pm->locked[0], pm->ready, &pm->next_ready);  
+            add_queue(index, pm->ready, &pm->next_ready);  
         
-        move_line(pm->locked, &pm->next_locked);
+        printf("_/> pid %d unblocked.\n", pm->pcb_table[index]->id);
         
+        move_queue(pm->blocked, &pm->next_blocked);
     }
+    
+    else printf("_/> No process to unblock.\n");
 }
 
 // current process finished (E instructio)
 // removes process from pcb table
-// atualizes index (w/ pcb) in ready and locked lines
+// atualizes index (w/ pcb) in ready and blocked queues
 void exit_process(process_manager_t* pm){
     
     int id = -1;
     
+    // gets the process index in pcb table
     for(int i = 0; i < pm->next_pcb; i++)
         if(pm->cpu->id == pm->pcb_table[i]->id)
             id = i;
-        
+    
+    // removes the process
     free(pm->pcb_table[id]);
     
+    // moves the other process ahead
     for(int i = id; i < pm->next_pcb-1; i++){
-   
         *(pm->pcb_table[i]) = (process_t) *(pm->pcb_table[i+1]);
         free(pm->pcb_table[i+1]);
     }
     
+    // decreases all indexes from remove positon
+    // until the end of the queue
     for(int i = 0; i < pm->next_ready; i++)
         if(pm->ready[i] > id)
             pm->ready[i]--;
     
-    for(int i = 0; i < pm->next_locked; i++)
-        if(pm->locked[i] > id)
-            pm->locked[i]--;
+    for(int i = 0; i < pm->next_blocked; i++)
+        if(pm->blocked[i] > id)
+            pm->blocked[i]--;
         
     pm->next_pcb--;
     pm->cpu = NULL;
@@ -225,7 +259,7 @@ void exit_process(process_manager_t* pm){
 
 // creates a copy of the current process.
 // sets child process id, pid, start time, cpu_usage.
-// adds new process to pcb table and ready line.
+// adds new process to pcb table and ready queue.
 // current process jumps 'value' instructions
 void fork_process(int value, process_manager_t* pm){
     
@@ -253,28 +287,28 @@ void run_image(char* program, process_t* p){
     
 }
 
-/* ***** LINES ***** */
-// creates an empty line
-int* new_line(){
+/* ***** QUEUES ***** */
+// creates an empty queue
+int* new_queue(){
     
-    int* line;
-    line = (int*) malloc (PROCESS_N * sizeof(int));
+    int* queue;
+    queue = (int*) malloc (PROCESS_N * sizeof(int));
     
     for(int i = 0; i < PROCESS_N; i++)
-        line[i] = -1;
+        queue[i] = -1;
     
-    return line;
+    return queue;
 }
 
-// adds an element to the end of the line
-void add_line(int x, int* line, int* size){
-    line[(*size)++] = x;
+// adds an element to the end of the queue
+void add_queue(int x, int* queue, int* size){
+    queue[(*size)++] = x;
 }
 
-// moves line forwards
+// moves queue forwards
 // first element out
-void move_line(int* line, int* size){
+void move_queue(int* queue, int* size){
     for(int i = 0; i < *size; i++)
-        line[i] = line[i+1];
+        queue[i] = queue[i+1];
     (*size)--;
 }

@@ -3,27 +3,29 @@
 #include <unistd.h>
 #include <ctype.h>
 
+// le entradas ate que seja uma valida
 char read_command();
 int verify_input(char);
 
+
 int main(){
 
-    int fd[2];
-    char c;
-    char* args[] = {"./manager", NULL};
-    pid_t cpid;
+    int fd[2];      // pipe
+    char c;         // entrada teclado
+    char* args[] = {"./manager", NULL}; // execv
+    pid_t pid;     // pid
 
     if(pipe(fd) < 0){
         perror("pipe");
         exit(EXIT_FAILURE);
     }
 
-    if((cpid = fork()) == -1){
+    if((pid = fork()) == -1){
         perror("fork");
         exit(EXIT_FAILURE);
     }
 
-    if(cpid == 0){
+    if(pid == 0){   // filho
         
         close(fd[1]);
         
@@ -32,12 +34,13 @@ int main(){
         
         execv(args[0], args);
         
-    } else {
+    } else {    // pai
         
         close(fd[0]);
         
         do {
             c = read_command();
+//             sleep(1);
             write(fd[1], &c, 1);
         }while (c != 'T');
         
