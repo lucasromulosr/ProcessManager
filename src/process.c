@@ -9,10 +9,24 @@ process_t* new_process(char* program){
     p->var = 0;
     p->cpu_usage = 0;
     p->instruction = new_instructions(program);
+    p->priority = set_priority(p->instruction);
+    p->priority_i = p->priority;
     
     return p;
 }
 
+// priority = number of 'B' instructions
+int set_priority(instruction_t** instruction){
+    
+    int priority = 0;
+    char c;     // instruction type
+    int i = 0;
+
+    while((c = instruction[i++]->type) != 'E')
+        if(c == 'B') priority++;
+    
+    return priority;
+}
 
 /* ***** INSTRUCTION ***** */
 // creates a instruction array from the program file 

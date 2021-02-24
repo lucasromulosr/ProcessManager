@@ -1,6 +1,10 @@
 S 50
 A 32
 D 32
+B
 D 50
+F 1
+R program2.txt
+B
 A 1
 E

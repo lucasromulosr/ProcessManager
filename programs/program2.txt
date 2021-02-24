@@ -1,0 +1,13 @@
+S 565
+B
+A 78
+A 98
+F 1
+R program4.txt
+B
+D 54
+D 78
+A 2
+B
+S 3
+E

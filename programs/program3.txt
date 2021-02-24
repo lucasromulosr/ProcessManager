@@ -1,0 +1,13 @@
+A 98
+F 1
+R program4.txt
+B
+A 55
+F 1
+R program4.txt
+D 22
+S 58
+A 1
+B
+D 96
+E

@@ -1,0 +1,13 @@
+A 52
+B
+B
+A 65
+D 98
+S 12
+B
+S 65
+D 88
+F 1
+R program3.txt
+B
+E

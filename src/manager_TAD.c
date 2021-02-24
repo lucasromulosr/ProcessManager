@@ -35,11 +35,15 @@ void reporter(process_manager_t* pm){
         write(fd[1], &pm->next_ready, sizeof(int));
         write(fd[1], &pm->next_blocked, sizeof(int));
         
+        // checks if cpu is empty to send its process
+        // and sends a signal to receive or not
         int null_cpu_signal = 0;
         if(pm->cpu == NULL) null_cpu_signal = 1;
         write(fd[1], &null_cpu_signal, sizeof(int));
         
-        write(fd[1], pm->cpu, sizeof(process_t));
+        // send the cpu if its not empty
+        if(!null_cpu_signal)
+            write(fd[1], pm->cpu, sizeof(process_t));
         
         for(int i = 0; i < pm->next_pcb; i++)
             write(fd[1], pm->pcb_table[i], sizeof(process_t));
@@ -147,27 +151,51 @@ void execute(process_manager_t* pm){
     scheduler(pm);
 }
 
-// after the execution, the scheduler takes the
-// running process to the end of the ready queue,
-// if the process didnt end of blocked;
-// the first process in ready queue goes to cpu
+// priority -> see process.set_priority()
+// the process in cpu runs 'priority+1' instructions
+// and then goes to the end of ready queue;
+// e.g: priority 0 runs 1, priority 1 runs 2, ...;
+// if theres no running process, the first in the
+// ready queue goes to cpu
 void scheduler(process_manager_t* pm){
 
+    process_t* cpu = pm->cpu;
     int id = -1;
-    if(pm->cpu != NULL)
-        for(int i = 0; i < pm->next_pcb; i++)
-            if(pm->cpu->id == pm->pcb_table[i]->id)
-                id = i;
+
+    // checks if there is a process in cpu
+    if(cpu != NULL){
+        
+        // checks if it has the priority to 
+        // keep running
+        if(!(cpu->priority_i-- > 0)){
+            
+            // resets priority counter
+            cpu->priority_i = cpu->priority;
+            
+            // gets the index in pcb to save to queue
+            for(int i = 0; i < pm->next_pcb; i++)
+                if(cpu->id == pm->pcb_table[i]->id)
+                    id = i;
     
-    if(id != -1)
-        add_queue(id, pm->ready, &pm->next_ready);
-    
-    ready_to_cpu(pm);
+            // ads process to ready queue and moves
+            // first ready process to cpu
+            add_queue(id, pm->ready, &pm->next_ready);
+            cpu = NULL;
+            ready_to_cpu(pm);
+        }
+        
+    } else
+        // if theres no process in cpu,
+        // moves the first ready to it
+        if(pm->next_ready > 0)
+        ready_to_cpu(pm);
 }
+
 
 /* ***** PROCESS ***** */
 // moves the first precess in ready queue
-// to the cpu and moves the queue
+// to the cpu and moves the queue;
+// if theres no process ready, cpu = empty
 void ready_to_cpu(process_manager_t* pm){
     
     // pm->next_ready indicates how many processes
@@ -181,6 +209,7 @@ void ready_to_cpu(process_manager_t* pm){
 
 // moves the current cpu process
 // to the blocked queue
+// and decreases process priority
 void block_process(process_manager_t* pm){
     
     int match = -1;
@@ -190,7 +219,10 @@ void block_process(process_manager_t* pm){
             match = i;
     
     // saves the index in the blocked queue
-    pm->blocked[pm->next_blocked++] = match;
+    // reduces priority
+    pm->cpu->priority--;
+    pm->cpu->priority_i = pm->cpu->priority;
+    add_queue(match, pm->blocked, &pm->next_blocked);  
     
     pm->cpu = NULL;
 }
@@ -253,7 +285,7 @@ void exit_process(process_manager_t* pm){
         if(pm->blocked[i] > id)
             pm->blocked[i]--;
         
-    pm->next_pcb--;
+    pm->next_pcb--; // decrease pcb size
     pm->cpu = NULL;
 }
 
@@ -274,21 +306,24 @@ void fork_process(int value, process_manager_t* pm){
     
     cpu->pc+=value;
     
-    pm->ready[pm->next_ready++] = pm->next_pcb;
+    add_queue(pm->next_pcb, pm->ready, &pm->next_ready);
     pm->pcb_table[pm->next_pcb++] = child;
 }
 
 // changes current process image
+// and sets its priorityu
 void run_image(char* program, process_t* p){
     
     p->pc = 0;
     p->var = 0;
     p->instruction = new_instructions(program);
-    
+    p->priority = set_priority(p->instruction);
+    p->priority_i = p->priority;
 }
 
 /* ***** QUEUES ***** */
-// creates an empty queue
+// creates an empty queue;
+// -1 represents empitness
 int* new_queue(){
     
     int* queue;
@@ -300,12 +335,13 @@ int* new_queue(){
     return queue;
 }
 
-// adds an element to the end of the queue
+// adds an element 'x' to the end of the queue;
+// increases size
 void add_queue(int x, int* queue, int* size){
     queue[(*size)++] = x;
 }
 
-// moves queue forwards
+// moves queue forwards;
 // first element out
 void move_queue(int* queue, int* size){
     for(int i = 0; i < *size; i++)
