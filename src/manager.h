@@ -17,7 +17,6 @@ typedef struct process_manager_t{
 
 /* -- REPORTER --*/
 void reporter(process_manager_t*);
-void report2(process_manager_t*);
 
 /* -- INITIALIZATION --*/
 process_manager_t* initialize_process_manager();

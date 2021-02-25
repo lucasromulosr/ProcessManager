@@ -40,7 +40,7 @@ int main(){
         
         do {
             c = read_command();
-//             sleep(1);
+			sleep(1);
             write(fd[1], &c, 1);
         }while (c != 'T');
         
