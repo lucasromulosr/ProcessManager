@@ -13,9 +13,9 @@ int main(){
     int id;         // pcb_table index
     process_t* p;   // points to process to print
     
-    printf("******************************************\n");
-    printf("Sys status:\n");
-    printf("******************************************\\\\\n");
+    printf("****************************************************\n");
+    printf("\t\t\tSys status:\n");
+    printf("****************************************************\n");
     printf("TIME RUNNING: \t%d\n", pm->timer);
     
     printf("|pid\t|ppid\t|prior.\t|var\t|start\t|cpu_usage\n");
