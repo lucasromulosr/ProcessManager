@@ -1,5 +1,4 @@
 # ProcessManager
-> In development.
 ##### v1.2.0 (final)
 
 ### Execucao
