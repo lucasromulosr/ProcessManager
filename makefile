@@ -38,14 +38,6 @@ install: binFolder all
 	@ $(CC) -o ./bin/reporter ./obj/reporter.o
 	@ echo 'ok'
 
-
-# $(EXEC): $(OBJ)
-# 	@ echo 'Building binary $@ using $(CC)...'
-# 	@ $(CC) -o $@ $^
-# 	@ echo 'Finished building $@.'
-
-
-
 objFolder:
 	@ [ -d ./obj ] || mkdir ./obj
 
